@@ -15,6 +15,7 @@ from utils import get_logger, get_optimizer, save_checkpoint
 def main(args):
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
+    os.chmod(args.log_dir, 0o0777)
     logger = get_logger(os.path.join(args.log_dir, 'main.log'))
     logger.info(args)
 
