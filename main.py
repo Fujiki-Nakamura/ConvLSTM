@@ -5,9 +5,8 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
-from tqdm import tqdm
+from tqdm import tqdm  # noqa
 
-from convlstm import ConvLSTM
 from MovingMNIST import MovingMNIST
 import models
 from utils import get_logger, save_checkpoint
@@ -32,7 +31,7 @@ def main(args):
     model = model.to(args.device)
 
     # training
-    xent_loss_fn = nn.CrossEntropyLoss()
+    xent_loss_fn = nn.CrossEntropyLoss()  # noqa
     criterion = nn.MSELoss(reduction='mean')
     optimizer = optim.Adam(
         model.parameters(),
@@ -42,7 +41,7 @@ def main(args):
     for epoch_i in range(1, 1 + args.epochs):
         model.train()
         losses = 0.
-        xent_train = 0.
+        # xent_train = 0.
         # pbar = tqdm(total=len(train_loader), position=0, desc='train')
         for i, (inputs, targets) in enumerate(train_loader):
             bs, ts, h, w = targets.size()
@@ -56,7 +55,7 @@ def main(args):
             # (bs, ts, h, w) -> (ts, bs, h, w)
             targets = targets.permute(1, 0, 2, 3)
             loss = 0.
-            xent = 0.
+            # xent = 0.
             for t_i in range(ts):
                 loss += criterion(outputs[t_i], targets[t_i])
                 # xent += xent_loss_fn(
@@ -74,7 +73,7 @@ def main(args):
 
         model.eval()
         test_losses = 0.
-        xent_val = 0.
+        # xent_val = 0.
         # pbar = tqdm(total=len(test_loader), position=0, desc='valid')
         for i, (inputs, targets) in enumerate(test_loader):
             bs, ts, h, w = targets.size()
@@ -88,7 +87,7 @@ def main(args):
                 # (bs, ts, h, w) -> (ts, bs, h, w)
                 targets = targets.permute(1, 0, 2, 3)
                 loss = 0.
-                xent = 0.
+                # xent = 0.
                 for t_i in range(ts):
                     loss += criterion(outputs[t_i], targets[t_i])
                     # xent += xent_loss_fn(
@@ -98,7 +97,7 @@ def main(args):
             logger.debug('Test/Batch {}/{}'.format(i + 1, len(test_loader)))
             # pbar.update(1)
         # pbar.close()
-        
+
         test_loss = test_losses / len(test_set)
         is_best = test_loss < best_loss
         if test_loss < best_loss:
@@ -109,8 +108,8 @@ def main(args):
             'test_loss': test_loss,
             'best_loss': best_loss,
             'optimizer': optimizer.state_dict(),
-        }, is_best, args.log_dir)	
-            
+        }, is_best, args.log_dir)
+
         writer.add_scalar('Train/Loss', losses / len(train_set), epoch_i)
         writer.add_scalar('Test/Loss', test_loss, epoch_i)
         # writer.add_scalar('Train/Xent', xent_train / len(train_set), epoch_i)
@@ -128,7 +127,7 @@ if __name__ == '__main__':
     parser.add_argument('--height', type=int, default=64)
     parser.add_argument('--width', type=int, default=64)
     parser.add_argument('--channels', type=int, default=1)
-    parser.add_argument('--hidden_dim', nargs='+', type=int, default=[64,])
+    parser.add_argument('--hidden_dim', nargs='+', type=int, default=[64, ])
     parser.add_argument('--kernel_size', nargs='+', type=int, default=(3, 3))
     parser.add_argument('--n_layers', type=int, default=1)
     # training
