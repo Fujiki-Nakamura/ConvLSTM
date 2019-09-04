@@ -10,6 +10,7 @@ from tqdm import tqdm  # noqa
 from MovingMNIST import MovingMNIST
 import models
 from utils import get_logger, get_optimizer, save_checkpoint
+from utils import get_scheduler
 
 
 def main(args):
@@ -35,6 +36,7 @@ def main(args):
     xent_loss_fn = nn.CrossEntropyLoss()  # noqa
     criterion = nn.MSELoss(reduction='mean')
     optimizer = get_optimizer(model, args)
+    scheduler = get_scheduler(optimizer, args)
 
     best_loss = 1e+6
     for epoch_i in range(1, 1 + args.epochs):
@@ -109,6 +111,9 @@ def main(args):
             'optimizer': optimizer.state_dict(),
         }, is_best, args.log_dir)
 
+        if scheduler is not None:
+            scheduler.step()
+
         writer.add_scalar('Train/Loss', losses / len(train_set), epoch_i)
         writer.add_scalar('Test/Loss', test_loss, epoch_i)
         # writer.add_scalar('Train/Xent', xent_train / len(train_set), epoch_i)
@@ -138,6 +143,9 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--betas', nargs='+', type=float, default=(0.9, 0.999))
     parser.add_argument('--weight_decay', type=float, default=0.)
+    parser.add_argument('--scheduler', type=str, default='')
+    parser.add_argument('--milestones', nargs='+', type=int, default=[30, ])
+    parser.add_argument('--gamma', nargs='+', type=float, default=0.9)
     # misc
     parser.add_argument('--log_dir', type=str, default='./log')
 

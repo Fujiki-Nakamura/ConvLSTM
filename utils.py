@@ -16,6 +16,15 @@ def get_optimizer(model, args):
     return optimizer
 
 
+def get_scheduler(optimizer, args):
+    if args.scheduler.lower() == 'multisteplr':
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer, args.milestones, args.gamma)
+    else:
+        return None
+    return scheduler
+
+
 def get_logger(log_file):
     from logging import getLogger, FileHandler, StreamHandler, Formatter, DEBUG, INFO, WARNING  # noqa
     fh = FileHandler(log_file)
