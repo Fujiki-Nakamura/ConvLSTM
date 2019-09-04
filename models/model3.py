@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from convlstm import ConvLSTM
+from .convlstm import ConvLSTM
 
 
 class Encoder(nn.Module):

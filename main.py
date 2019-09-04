@@ -122,7 +122,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # network
-    parser.add_argument('--model', type=str, default='model3')
+    parser.add_argument('--model', type=str, default='convlstm_3_layers')
     parser.add_argument('--height', type=int, default=64)
     parser.add_argument('--width', type=int, default=64)
     parser.add_argument('--channels', type=int, default=1)

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
-from convlstm import ConvLSTM
+
+from .convlstm import ConvLSTM
 
 
 class Encoder(nn.Module):
@@ -9,7 +10,7 @@ class Encoder(nn.Module):
 
         self.convlstm1 = ConvLSTM(
             input_size=(args.height, args.width), input_dim=args.channels,
-            hidden_dim=[64,], kernel_size=(5, 5), num_layers=1,
+            hidden_dim=[128, 64, 64], kernel_size=(5, 5), num_layers=3,
             batch_first=True, bias=True, return_all_layers=True)
 
     def forward(self, x):
@@ -23,7 +24,7 @@ class Decoder(nn.Module):
 
         self.convlstm1 = ConvLSTM(
             input_size=(args.height, args.width), input_dim=64,
-            hidden_dim=[64,], kernel_size=(5, 5), num_layers=1,
+            hidden_dim=[128, 64, 64], kernel_size=(5, 5), num_layers=3,
             batch_first=True, bias=True, return_all_layers=True)
 
     def forward(self, x, hidden_list=None):
@@ -38,7 +39,7 @@ class Model(nn.Module):
         self.encoder = Encoder(args)
         self.decoder = Decoder(args)
         self.conv1x1 = nn.Conv2d(
-            64, args.channels, kernel_size=(1, 1), stride=1, padding=0)
+            128 + 64 + 64, args.channels, kernel_size=(1, 1), stride=1, padding=0)
 
     def forward(self, x):
         out_e, hidden_list = self.encoder(x)
@@ -49,5 +50,5 @@ class Model(nn.Module):
         return out.view(bs, t, -1, h, w)
 
 
-def convlstm_1(args):
-    return Model(args) 
+def convlstm_3_layers(args):
+    return Model(args)
