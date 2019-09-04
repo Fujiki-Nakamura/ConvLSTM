@@ -1,3 +1,6 @@
+'''
+from https://github.com/tychovdo/MovingMNIST
+'''
 from __future__ import print_function
 import torch.utils.data as data
 from PIL import Image
