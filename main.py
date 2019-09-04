@@ -26,7 +26,7 @@ def main(args):
     train_set = MovingMNIST(root='./data/train', train=True, download=True)
     test_set = MovingMNIST(root='./data/test', train=False, download=True)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
     # network
     model = models.__dict__[args.model](args=args)
