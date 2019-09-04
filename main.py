@@ -2,14 +2,14 @@ import argparse
 import os
 
 import torch
-from torch import nn, optim
+from torch import nn
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm  # noqa
 
 from MovingMNIST import MovingMNIST
 import models
-from utils import get_logger, save_checkpoint
+from utils import get_logger, get_optimizer, save_checkpoint
 
 
 def main(args):
@@ -33,9 +33,7 @@ def main(args):
     # training
     xent_loss_fn = nn.CrossEntropyLoss()  # noqa
     criterion = nn.MSELoss(reduction='mean')
-    optimizer = optim.Adam(
-        model.parameters(),
-        lr=args.lr, betas=args.betas, weight_decay=args.weight_decay)
+    optimizer = get_optimizer(model, args)
 
     best_loss = 1e+6
     for epoch_i in range(1, 1 + args.epochs):
@@ -135,6 +133,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--device', type=int, default=0)
     # optim
+    parser.add_argument('--optim', type=str, default='adam')
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--betas', nargs='+', type=float, default=(0.9, 0.999))
     parser.add_argument('--weight_decay', type=float, default=0.)

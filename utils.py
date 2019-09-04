@@ -1,6 +1,19 @@
 import os
 import shutil
 import torch
+from torch import optim
+
+
+def get_optimizer(model, args):
+    if args.optim.lower() == 'adam':
+        optimizer = optim.Adam(
+            model.parameters(),
+            lr=args.lr, betas=args.betas, weight_decay=args.weight_decay)
+    elif args.optim.lower() == 'rmsprop':
+        optimizer = optim.RMSprop(
+            model.parameters(),
+            lr=args.lr, alpha=0.99, weight_decay=args.weight_decay)
+    return optimizer
 
 
 def get_logger(log_file):
