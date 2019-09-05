@@ -1,7 +1,17 @@
 import os
 import shutil
 import torch
-from torch import optim
+from torch import nn, optim
+
+
+def get_loss_fn(args):
+    if args.loss.lower() == 'bceloss':
+        loss_fn = nn.BCEWithLogitsLoss(reduction=args.reduction)
+    elif args.loss.lower() == 'mseloss':
+        loss_fn = nn.MSELoss(reduction=args.reduction)
+    else:
+        raise NotImplementedError
+    return loss_fn
 
 
 def get_optimizer(model, args):

@@ -10,7 +10,7 @@ from tqdm import tqdm  # noqa
 from MovingMNIST import MovingMNIST
 import models
 from utils import get_logger, get_optimizer, save_checkpoint
-from utils import get_scheduler
+from utils import get_scheduler, get_loss_fn
 
 
 def main(args):
@@ -33,8 +33,8 @@ def main(args):
     model = model.to(args.device)
 
     # training
-    xent_loss_fn = nn.CrossEntropyLoss()  # noqa
-    criterion = nn.MSELoss(reduction='mean')
+    criterion = get_loss_fn(args)
+    mse_loss_fn = nn.MSELoss(reduction='mean')
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
@@ -42,8 +42,7 @@ def main(args):
     for epoch_i in range(1, 1 + args.epochs):
         model.train()
         losses = 0.
-        # xent_train = 0.
-        # pbar = tqdm(total=len(train_loader), position=0, desc='train')
+        mse_losses = 0.
         for i, (inputs, targets) in enumerate(train_loader):
             bs, ts, h, w = targets.size()
             inputs = inputs.unsqueeze(2)
@@ -56,26 +55,21 @@ def main(args):
             # (bs, ts, h, w) -> (ts, bs, h, w)
             targets = targets.permute(1, 0, 2, 3)
             loss = 0.
-            # xent = 0.
+            mse_loss = 0.
             for t_i in range(ts):
                 loss += criterion(outputs[t_i], targets[t_i])
-                # xent += xent_loss_fn(
-                #    outputs[t_i].view(bs, -1), targets[t_i].view(bs, -1))
+                mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             losses += loss.item() * bs
-            # xent_train += xent.item() * bs
+            mse_losses += mse_loss.item() * bs
             logger.debug('Train/Batch {}/{}'.format(i + 1, len(train_loader)))
-
-            # pbar.update(1)
-        # pbar.close()
 
         model.eval()
         test_losses = 0.
-        # xent_val = 0.
-        # pbar = tqdm(total=len(test_loader), position=0, desc='valid')
+        test_mse_losses = 0.
         for i, (inputs, targets) in enumerate(test_loader):
             bs, ts, h, w = targets.size()
             inputs = inputs.unsqueeze(2)
@@ -88,16 +82,13 @@ def main(args):
                 # (bs, ts, h, w) -> (ts, bs, h, w)
                 targets = targets.permute(1, 0, 2, 3)
                 loss = 0.
-                # xent = 0.
+                mse_loss = 0.
                 for t_i in range(ts):
                     loss += criterion(outputs[t_i], targets[t_i])
-                    # xent += xent_loss_fn(
-                    #     outputs[t_i].view(bs, -1), targets[t_i].view(bs, -1))
+                    mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
             test_losses += loss.item() * bs
-            # xent_val += xent.item() * bs
+            test_mse_losses += mse_loss.item() * bs
             logger.debug('Test/Batch {}/{}'.format(i + 1, len(test_loader)))
-            # pbar.update(1)
-        # pbar.close()
 
         test_loss = test_losses / len(test_set)
         is_best = test_loss < best_loss
@@ -114,10 +105,10 @@ def main(args):
         if scheduler is not None:
             scheduler.step()
 
-        writer.add_scalar('Train/Loss', losses / len(train_set), epoch_i)
-        writer.add_scalar('Test/Loss', test_loss, epoch_i)
-        # writer.add_scalar('Train/Xent', xent_train / len(train_set), epoch_i)
-        # writer.add_scalar('Test/Xent', xent_test / leln(test_set), epoch_i)
+        writer.add_scalar('Train/BCE', losses / len(train_set), epoch_i)
+        writer.add_scalar('Test/BCE', test_loss, epoch_i)
+        writer.add_scalar('Train/Loss', mse_losses / len(train_set), epoch_i)
+        writer.add_scalar('Test/Loss', test_mse_losses / len(test_set), epoch_i)
 
         logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
             epoch_i,
@@ -135,6 +126,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--device', type=int, default=0)
+    parser.add_argument('--loss', type=str, default='mseloss')
+    parser.add_argument('--reduction', type=str, default='mean')
     # optim
     parser.add_argument('--optim', type=str, default='adam')
     parser.add_argument('--lr', type=float, default=0.001)
