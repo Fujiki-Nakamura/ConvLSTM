@@ -34,7 +34,7 @@ def main(args):
 
     # training
     criterion = get_loss_fn(args)
-    mse_loss_fn = nn.MSELoss(reduction='mean')
+    mse_loss_fn = nn.MSELoss(reduction=args.reduction)
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
@@ -63,8 +63,8 @@ def main(args):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            losses += loss.item() * bs
-            mse_losses += mse_loss.item() * bs
+            losses += loss.item() * bs if args.reduction.lower().startswith('mean') else loss.item()
+            mse_losses += mse_loss.item() * bs if args.reduction.lower().startswith('mean') else mse_loss.item()
             logger.debug('Train/Batch {}/{}'.format(i + 1, len(train_loader)))
 
         model.eval()
@@ -86,11 +86,14 @@ def main(args):
                 for t_i in range(ts):
                     loss += criterion(outputs[t_i], targets[t_i])
                     mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
-            test_losses += loss.item() * bs
-            test_mse_losses += mse_loss.item() * bs
+            test_losses += loss.item() * bs if args.reduction.lower().startswith('mean') else loss.item()
+            test_mse_losses += mse_loss.item() * bs if args.reduction.lower().startswith('mean') else mse_loss.item()
             logger.debug('Test/Batch {}/{}'.format(i + 1, len(test_loader)))
 
-        test_loss = test_losses / len(test_set)
+        if args.reduction.lower() == 'sum':
+            test_loss = test_losses
+        else:
+            test_loss = test_losses / len(test_set)
         is_best = test_loss < best_loss
         if test_loss < best_loss:
             best_loss = test_loss
@@ -105,10 +108,13 @@ def main(args):
         if scheduler is not None:
             scheduler.step()
 
-        writer.add_scalar('Train/BCE', losses / len(train_set), epoch_i)
+        train_loss = losses if args.reduction.lower() == 'sum' else losses / len(train_set)
+        train_mse_loss = mse_losses if args.reduction.lower() == 'sum' else mse_losses / len(train_set)
+        test_mse_loss = test_mse_losses if args.reduction.lower() == 'sum' else test_mse_losses / len(test_set)
+        writer.add_scalar('Train/BCE', train_loss, epoch_i)
         writer.add_scalar('Test/BCE', test_loss, epoch_i)
-        writer.add_scalar('Train/Loss', mse_losses / len(train_set), epoch_i)
-        writer.add_scalar('Test/Loss', test_mse_losses / len(test_set), epoch_i)
+        writer.add_scalar('Train/Loss', train_mse_loss, epoch_i)
+        writer.add_scalar('Test/Loss', test_mse_loss, epoch_i)
 
         logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
             epoch_i,
