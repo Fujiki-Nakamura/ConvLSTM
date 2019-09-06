@@ -137,8 +137,8 @@ if __name__ == '__main__':
     parser.add_argument('--betas', nargs='+', type=float, default=(0.9, 0.999))
     parser.add_argument('--weight_decay', type=float, default=0.)
     parser.add_argument('--scheduler', type=str, default='')
-    parser.add_argument('--milestones', nargs='+', type=int, default=[30, ])
-    parser.add_argument('--gamma', nargs='+', type=float, default=0.9)
+    parser.add_argument('--milestones', nargs='+', type=int)
+    parser.add_argument('--gamma', nargs='+', type=float)
     # misc
     parser.add_argument('--log_dir', type=str, default='./log')
 
