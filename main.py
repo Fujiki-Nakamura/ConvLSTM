@@ -115,8 +115,7 @@ def main(args):
         writer.add_scalar('Test/Loss', test_mse_loss, epoch_i)
 
         logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
-            epoch_i,
-            losses / len(train_set), test_loss))
+            epoch_i, train_loss, test_loss))
 
 
 if __name__ == '__main__':
