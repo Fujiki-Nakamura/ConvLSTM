@@ -2,7 +2,6 @@ import argparse
 import os
 
 import torch
-from torch import nn
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm  # noqa
@@ -34,7 +33,6 @@ def main(args):
 
     # training
     criterion = get_loss_fn(args)
-    mse_loss_fn = nn.MSELoss(reduction='mean')
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
@@ -42,7 +40,6 @@ def main(args):
     for epoch_i in range(1, 1 + args.epochs):
         model.train()
         losses = 0.
-        mse_losses = 0.
         for i, (inputs, targets) in enumerate(train_loader):
             bs, ts, h, w = targets.size()
             inputs = inputs.unsqueeze(2)
@@ -55,13 +52,10 @@ def main(args):
             # (bs, ts, h, w) -> (ts, bs, h, w)
             targets = targets.permute(1, 0, 2, 3)
             loss = 0.
-            mse_loss = 0.
             for t_i in range(ts):
                 loss += criterion(outputs[t_i], targets[t_i]) / bs
-                mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
 
             losses += loss.item() * bs
-            mse_losses += mse_loss.item() * bs
 
             optimizer.zero_grad()
             loss.backward()
@@ -70,7 +64,6 @@ def main(args):
 
         model.eval()
         test_losses = 0.
-        test_mse_losses = 0.
         for i, (inputs, targets) in enumerate(test_loader):
             bs, ts, h, w = targets.size()
             inputs = inputs.unsqueeze(2)
@@ -83,15 +76,18 @@ def main(args):
                 # (bs, ts, h, w) -> (ts, bs, h, w)
                 targets = targets.permute(1, 0, 2, 3)
                 loss = 0.
-                mse_loss = 0.
                 for t_i in range(ts):
                     loss += criterion(outputs[t_i], targets[t_i]) / bs
-                    mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
             test_losses += loss.item() * bs
-            test_mse_losses += mse_loss.item() * bs
             logger.debug('Test/Batch {}/{}'.format(i + 1, len(test_loader)))
 
+        train_loss = losses / len(train_set)
         test_loss = test_losses / len(test_set)
+        writer.add_scalar('Train/{}'.format(args.loss), train_loss, epoch_i)
+        writer.add_scalar('Test/{}'.format(args.loss), test_loss, epoch_i)
+        logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
+            epoch_i, train_loss, test_loss))
+
         is_best = test_loss < best_loss
         if test_loss < best_loss:
             best_loss = test_loss
@@ -106,17 +102,6 @@ def main(args):
         if scheduler is not None:
             scheduler.step()
 
-        train_loss = losses / len(train_set)
-        train_mse_loss = mse_losses / len(train_set)
-        test_mse_loss = test_mse_losses / len(test_set)
-        writer.add_scalar('Train/BCE', train_loss, epoch_i)
-        writer.add_scalar('Test/BCE', test_loss, epoch_i)
-        writer.add_scalar('Train/Loss', train_mse_loss, epoch_i)
-        writer.add_scalar('Test/Loss', test_mse_loss, epoch_i)
-
-        logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
-            epoch_i, train_loss, test_loss))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -129,7 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--device', type=int, default=0)
-    parser.add_argument('--loss', type=str, default='mseloss')
+    parser.add_argument('--loss', type=str, default='mse')
     parser.add_argument('--reduction', type=str, default='mean')
     # optim
     parser.add_argument('--optim', type=str, default='adam')
