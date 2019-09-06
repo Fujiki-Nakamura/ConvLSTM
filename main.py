@@ -2,6 +2,7 @@ import argparse
 import os
 
 import torch
+from torch import nn
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from tqdm import tqdm  # noqa
@@ -29,7 +30,9 @@ def main(args):
 
     # network
     model = models.__dict__[args.model](args=args)
-    model = model.to(args.device)
+    model = nn.DataParallel(model)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
 
     # training
     criterion = get_loss_fn(args)
