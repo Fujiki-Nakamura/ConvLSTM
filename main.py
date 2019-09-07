@@ -14,6 +14,9 @@ from utils import get_scheduler, get_loss_fn
 
 
 def main(args):
+    start_epoch = 1
+    best_loss = 1e+6
+
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
     os.chmod(args.log_dir, 0o0777)
@@ -33,14 +36,24 @@ def main(args):
     model = nn.DataParallel(model)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-
     # training
     criterion = get_loss_fn(args)
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
-    best_loss = 1e+6
-    for epoch_i in range(1, 1 + args.epochs):
+    if args.resume:
+        if os.path.isfile(args.resume):
+            checkpoint = torch.load(args.resume)
+            start_epoch = checkpoint['epoch'] + 1
+            best_loss = checkpoint['best_loss']
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            logger.info('Loaded checkpoint {} (epoch {})'.format(
+                args.resume, start_epoch - 1))
+        else:
+            raise IOError('No such file {}'.format(args.resume))
+
+    for epoch_i in range(start_epoch, args.epochs + 1):
         model.train()
         losses = 0.
         for i, (inputs, targets) in enumerate(train_loader):
@@ -129,6 +142,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', nargs='+', type=float)
     # misc
     parser.add_argument('--log_dir', type=str, default='./log')
+    parser.add_argument('--resume', type=str, default=None)
 
     args, _ = parser.parse_known_args()
     main(args)
