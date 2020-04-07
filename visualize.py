@@ -1,4 +1,5 @@
 import argparse
+from collections import OrderedDict
 import os
 
 import numpy as np
@@ -17,8 +18,12 @@ def main(args):
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=False)
 
     checkpoint = torch.load(args.checkpoint)
+    new_state_dict = OrderedDict()
+    for k, v in iter(checkpoint['state_dict'].items()):
+        new_k = k.replace('module.', '')
+        new_state_dict[new_k] = v
     model = models.__dict__[args.model](args)
-    model.load_state_dict(checkpoint['state_dict'])
+    model.load_state_dict(new_state_dict)
     model.to(args.device)
     model.eval()
 

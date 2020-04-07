@@ -14,6 +14,9 @@ from utils import get_scheduler, get_loss_fn
 
 
 def main(args):
+    start_epoch = 1
+    best_loss = 1e+6
+
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
     os.chmod(args.log_dir, 0o0777)
@@ -30,19 +33,29 @@ def main(args):
 
     # network
     model = models.__dict__[args.model](args=args)
-    model = model.to(args.device)
-
+    model = nn.DataParallel(model)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
     # training
     criterion = get_loss_fn(args)
-    mse_loss_fn = nn.MSELoss(reduction='mean')
     optimizer = get_optimizer(model, args)
     scheduler = get_scheduler(optimizer, args)
 
-    best_loss = 1e+6
-    for epoch_i in range(1, 1 + args.epochs):
+    if args.resume:
+        if os.path.isfile(args.resume):
+            checkpoint = torch.load(args.resume)
+            start_epoch = checkpoint['epoch'] + 1
+            best_loss = checkpoint['best_loss']
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            logger.info('Loaded checkpoint {} (epoch {})'.format(
+                args.resume, start_epoch - 1))
+        else:
+            raise IOError('No such file {}'.format(args.resume))
+
+    for epoch_i in range(start_epoch, args.epochs + 1):
         model.train()
         losses = 0.
-        mse_losses = 0.
         for i, (inputs, targets) in enumerate(train_loader):
             bs, ts, h, w = targets.size()
             inputs = inputs.unsqueeze(2)
@@ -55,21 +68,18 @@ def main(args):
             # (bs, ts, h, w) -> (ts, bs, h, w)
             targets = targets.permute(1, 0, 2, 3)
             loss = 0.
-            mse_loss = 0.
             for t_i in range(ts):
-                loss += criterion(outputs[t_i], targets[t_i])
-                mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
+                loss += criterion(outputs[t_i], targets[t_i]) / bs
+
+            losses += loss.item() * bs
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            losses += loss.item() * bs
-            mse_losses += mse_loss.item() * bs
             logger.debug('Train/Batch {}/{}'.format(i + 1, len(train_loader)))
 
         model.eval()
         test_losses = 0.
-        test_mse_losses = 0.
         for i, (inputs, targets) in enumerate(test_loader):
             bs, ts, h, w = targets.size()
             inputs = inputs.unsqueeze(2)
@@ -82,15 +92,18 @@ def main(args):
                 # (bs, ts, h, w) -> (ts, bs, h, w)
                 targets = targets.permute(1, 0, 2, 3)
                 loss = 0.
-                mse_loss = 0.
                 for t_i in range(ts):
-                    loss += criterion(outputs[t_i], targets[t_i])
-                    mse_loss += mse_loss_fn(outputs[t_i], targets[t_i])
+                    loss += criterion(outputs[t_i], targets[t_i]) / bs
             test_losses += loss.item() * bs
-            test_mse_losses += mse_loss.item() * bs
             logger.debug('Test/Batch {}/{}'.format(i + 1, len(test_loader)))
 
+        train_loss = losses / len(train_set)
         test_loss = test_losses / len(test_set)
+        writer.add_scalar('Train/{}'.format(args.loss), train_loss, epoch_i)
+        writer.add_scalar('Test/{}'.format(args.loss), test_loss, epoch_i)
+        logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
+            epoch_i, train_loss, test_loss))
+
         is_best = test_loss < best_loss
         if test_loss < best_loss:
             best_loss = test_loss
@@ -105,15 +118,6 @@ def main(args):
         if scheduler is not None:
             scheduler.step()
 
-        writer.add_scalar('Train/BCE', losses / len(train_set), epoch_i)
-        writer.add_scalar('Test/BCE', test_loss, epoch_i)
-        writer.add_scalar('Train/Loss', mse_losses / len(train_set), epoch_i)
-        writer.add_scalar('Test/Loss', test_mse_losses / len(test_set), epoch_i)
-
-        logger.info('Epoch {} Train/Loss {:.4f} Test/Loss {:.4f}'.format(
-            epoch_i,
-            losses / len(train_set), test_loss))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -126,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--device', type=int, default=0)
-    parser.add_argument('--loss', type=str, default='mseloss')
+    parser.add_argument('--loss', type=str, default='mse')
     parser.add_argument('--reduction', type=str, default='mean')
     # optim
     parser.add_argument('--optim', type=str, default='adam')
@@ -134,10 +138,11 @@ if __name__ == '__main__':
     parser.add_argument('--betas', nargs='+', type=float, default=(0.9, 0.999))
     parser.add_argument('--weight_decay', type=float, default=0.)
     parser.add_argument('--scheduler', type=str, default='')
-    parser.add_argument('--milestones', nargs='+', type=int, default=[30, ])
-    parser.add_argument('--gamma', nargs='+', type=float, default=0.9)
+    parser.add_argument('--milestones', nargs='+', type=int)
+    parser.add_argument('--gamma', nargs='+', type=float)
     # misc
     parser.add_argument('--log_dir', type=str, default='./log')
+    parser.add_argument('--resume', type=str, default=None)
 
     args, _ = parser.parse_known_args()
     main(args)
